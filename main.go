@@ -5,6 +5,7 @@ import (
     "fmt"
     "strconv"
     "unicode"
+    "errors"
 
 )
 
@@ -15,9 +16,11 @@ const (
     Minus
     Multiply
     Caret
-    Intnumber  
+    IntNumber  
     FloatNumber 
     Variable 
+    VariableDegree1
+    VariableDegree2
 )
 
 
@@ -29,6 +32,8 @@ var TokenState = map[string]Tokens{
     "^": Caret,
     "X": Variable,
     "x": Variable,
+    "x^2": VariableDegree2,
+    "x^1": VariableDegree1,
     
 }
 
@@ -38,6 +43,8 @@ var TokenStr = map[Tokens]string{
     Multiply: "*",
     Caret : "^",
     Variable: "X",
+    VariableDegree2: "x^2",
+    VariableDegree1: "x^1",
 }
 
 
@@ -51,21 +58,86 @@ func Fatal(msg string) {
 
     os.Exit(1)
 }
+// helpers 
+
+func isOperation(t Tokens) bool {
+    if t != Plus && t != Minus && t != Multiply && Caret != t {
+        return false
+    } 
+
+    return true
+}
 
 
-func main(){
 
+func SimplifyVariables (tokens []Tokens, numbers []int, floatNumbers[]float32) error {
     var (
-        input string
-        tokens []Tokens
-        numbers []int
+        newTokens []Tokens
+        newNumbers []int
+        numberIndex int
     )
 
-    if len(os.Args) != 2{
-        Fatal("we need 2 arguments")
-    }
+
+    numberIndex = 0
     
-    input = os.Args[1]
+   
+
+
+    for i := 0; i < len(tokens); i++ {
+
+        if tokens[i] == Variable {
+            if i + 1 == len(tokens) {
+                newTokens = append(newTokens, VariableDegree1)
+            } else {
+
+                if isOperation(tokens[i + 1]) == false {
+                    return errors.New("Invalid equation operations must be after the variable")
+                }
+
+                if tokens[i + 1] == Caret {
+                    if i + 2 >= len(tokens) || tokens[i + 2] != IntNumber {
+                        return errors.New("Invalid equation no number was provided after this \"^\"")
+                    }
+
+                    switch numbers[numberIndex] {
+                        case 0:
+                            newNumbers = append(newNumbers, 1)
+                            newTokens = append(newTokens, IntNumber)
+                        case 1:
+                            newTokens = append(newTokens, VariableDegree1)
+                        case 2:
+                            newTokens = append(newTokens, VariableDegree2)
+                        default:
+                            return errors.New("we only some second degree equations")
+                    }
+                    numberIndex++
+                    i+=2 
+                } else {
+                            newTokens = append(newTokens, VariableDegree1)
+                }
+            }
+
+        } else {
+            if tokens[i] == IntNumber {
+                newNumbers = append(newNumbers, numbers[numberIndex])
+                numberIndex++
+            }
+            newTokens = append(newTokens, tokens[i])
+        }
+    }
+
+
+    dbg(newTokens, newNumbers, floatNumbers)
+    return nil
+}
+
+func Parse(input string) ([]Tokens, []int,[]float32, error) {
+    var (
+        tokens []Tokens
+        numbers []int
+        floatNumbers []float32
+    )
+
 
     for i := 0; i < len(input); i++ {
 
@@ -81,33 +153,83 @@ func main(){
             var (
                 s int
                 e int
+                isFloat bool
             )
-            tokens = append(tokens, Intnumber)
+
+            isFloat = false
             s = i
             for ; i < len(input) && (unicode.IsDigit(rune(input[i])) || input[i] == '.'); i++{
+                if input[i] == '.'{
+                    isFloat = true
+
+                }
 
             }
             e = i 
-            val, err := strconv.Atoi(input[s:e])
+            if isFloat == true {
+                tokens = append(tokens, FloatNumber)
+                val, err := strconv.ParseFloat(input[s:e], 32)
 
-            if err != nil {
-                fmt.Println(input[s:e], s, e)
-                Fatal("error parssing number")
+                if err != nil {
+                    fmt.Println(input[s:e], s, e)
+                    Fatal("error parssing number")
+                }
+                floatNumbers = append(floatNumbers, float32(val))
+
+            }else {
+
+                tokens = append(tokens, IntNumber)
+                val, err := strconv.Atoi(input[s:e])
+                if err != nil {
+                    fmt.Println(input[s:e], s, e)
+                    Fatal("error parssing number")
+                }
+                numbers = append(numbers, val)
             }
-            numbers = append(numbers, val)
             i--;
         }
     }
 
-    // dbg
+    return  tokens, numbers, floatNumbers ,nil
+}
+
+
+func dbg (tokens []Tokens, numbers []int, floatNumbers[]float32){
 
     j := 0
+    k := 0 
     for i := 0; i < len(tokens); i++{
-        if val, ok := TokenStr[tokens[i]]; ok  == true{
-            fmt.Printf("%s ", val)
-        }else {
-            fmt.Printf("%d", numbers[j])
+        val, ok := TokenStr[tokens[i]];
+        if  ok  == true{
+            fmt.Printf(" %s ", val)
+        }else if tokens[i] ==  IntNumber{
+            fmt.Printf(" %d ", numbers[j])
             j++
+        } else {
+            fmt.Printf(" %.2f ", floatNumbers[k])
+            k++
         }
     }
+
+}
+
+
+func main(){
+
+    var (
+        tokens []Tokens
+        numbers []int
+        floatNumbers []float32
+    )
+
+    if len(os.Args) != 2{
+        Fatal("we need 2 arguments")
+    }
+    
+    tokens, numbers,floatNumbers, _ = Parse(os.Args[1])
+
+    SimplifyVariables(tokens, numbers, floatNumbers)
+   // dbg(tokens, numbers, floatNumbers)
+    
+
 }
