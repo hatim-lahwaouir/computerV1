@@ -21,6 +21,7 @@ const (
     Variable 
     VariableDegree1
     VariableDegree2
+    Empty
 )
 
 
@@ -70,7 +71,7 @@ func isOperation(t Tokens) bool {
 
 
 
-func SimplifyVariables (tokens []Tokens, numbers []int, floatNumbers[]float32) error {
+func SimplifyVariables1 (tokens []Tokens, numbers []int, floatNumbers[]float32) ([]Tokens, []int, []float32, error) {
     var (
         newTokens []Tokens
         newNumbers []int
@@ -91,12 +92,12 @@ func SimplifyVariables (tokens []Tokens, numbers []int, floatNumbers[]float32) e
             } else {
 
                 if isOperation(tokens[i + 1]) == false {
-                    return errors.New("Invalid equation operations must be after the variable")
+                    return nil,nil,nil ,errors.New("Invalid equation operations must be after the variable")
                 }
 
                 if tokens[i + 1] == Caret {
                     if i + 2 >= len(tokens) || tokens[i + 2] != IntNumber {
-                        return errors.New("Invalid equation no number was provided after this \"^\"")
+                        return nil, nil, nil,errors.New("Invalid equation no number was provided after this \"^\"")
                     }
 
                     switch numbers[numberIndex] {
@@ -108,7 +109,7 @@ func SimplifyVariables (tokens []Tokens, numbers []int, floatNumbers[]float32) e
                         case 2:
                             newTokens = append(newTokens, VariableDegree2)
                         default:
-                            return errors.New("we only some second degree equations")
+                            return nil,nil,nil, errors.New("we only solve second degree equations")
                     }
                     numberIndex++
                     i+=2 
@@ -127,8 +128,79 @@ func SimplifyVariables (tokens []Tokens, numbers []int, floatNumbers[]float32) e
     }
 
 
-    dbg(newTokens, newNumbers, floatNumbers)
-    return nil
+    return newTokens, newNumbers, floatNumbers, nil
+}
+
+
+func SimplifyVariables2 (tokens []Tokens) ([]Tokens, error) {
+
+    var (
+            newTokens []Tokens
+        )
+
+        for i := 0; i < len(tokens); i++ {
+                if tokens[i] == Empty{
+                    continue
+                }
+        
+                
+                if tokens[i] == VariableDegree1 || tokens[i] ==  VariableDegree2 {
+                    var (
+                        oper bool
+                        degree int
+
+                    )
+                    oper = false 
+                    degree = 0 
+
+
+
+                    if i + 1 >= len(tokens) {
+                        newTokens = append(newTokens, tokens[i])
+                        break 
+                    }
+                    j := i
+                    for ; j < len(tokens); j++{
+                        if oper {
+                            if tokens[j] != Multiply {
+                                break
+                            }
+                        } else {
+                            if degree == 1  && (tokens[j] == VariableDegree2 ||  tokens[j] == VariableDegree1){
+                                tokens[j- 1] = Empty 
+                            }
+                            
+                            if tokens[j] == VariableDegree1 {
+                                tokens[j] = Empty 
+                                degree++
+                            } else if  tokens[j] == VariableDegree2 {
+                                tokens[j] = Empty 
+                                degree += 2
+                            }
+
+                            
+                        }
+
+
+                        
+                        oper = !oper
+                    }
+                    //tokens[j - 2] = Empty
+
+                    if degree == 1 {
+                            newTokens = append(newTokens, VariableDegree1)
+                    } else if degree == 2 {
+                            newTokens = append(newTokens, VariableDegree2)
+                    }else {
+                            return nil, errors.New("we only solve second degree equations")
+                    }
+                    
+                }else {
+                    newTokens = append(newTokens, tokens[i])
+                }
+        }
+        return newTokens, nil
+
 }
 
 func Parse(input string) ([]Tokens, []int,[]float32, error) {
@@ -228,8 +300,17 @@ func main(){
     
     tokens, numbers,floatNumbers, _ = Parse(os.Args[1])
 
-    SimplifyVariables(tokens, numbers, floatNumbers)
-   // dbg(tokens, numbers, floatNumbers)
+    tokens, numbers, floatNumbers, err := SimplifyVariables1(tokens, numbers, floatNumbers)
+
+    if err != nil {
+        Fatal(err.Error())
+    }
+
+    tokens, err = SimplifyVariables2(tokens)
+    if err != nil {
+        Fatal(err.Error())
+    }
+    dbg(tokens, numbers, floatNumbers)
     
 
 }
