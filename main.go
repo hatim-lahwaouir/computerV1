@@ -8,47 +8,8 @@ import (
 	"unicode"
 )
 
-type Tokens int
 
-const (
-	Plus = iota
-	Minus
-	Multiply
-	Caret
-	IntNumber
-	FloatNumber
-	Variable
-	VariableDegree1
-	VariableDegree2
-	Empty
-    VariableDegree2Negatif
-    VariableDegree1Negatif
-)
 
-var TokenState = map[string]Tokens{
-	"+":   Plus,
-	"-":   Minus,
-	"*":   Multiply,
-	"^":   Caret,
-	"X":   Variable,
-	"x":   Variable,
-	"x^2": VariableDegree2,
-	"x^1": VariableDegree1,
-	"(-x^2)": VariableDegree2Negatif,
-	"(-x^1)": VariableDegree1Negatif,
-}
-
-var TokenStr = map[Tokens]string{
-	Plus:            "+",
-	Minus:           "-",
-	Multiply:        "*",
-	Caret:           "^",
-	Variable:        "X",
-	VariableDegree2: "x^2",
-	VariableDegree1: "x^1",
-    VariableDegree2Negatif: "(-x^2)",
-    VariableDegree1Negatif: "(-x^1)",
-}
 
 // error function
 
@@ -61,7 +22,8 @@ func Fatal(msg string) {
 
 // helpers
 
-func isOperation(t Tokens) bool {
+func IsOperation(token Token) bool {
+    t := token.GetType()
 	if t != Plus && t != Minus && t != Multiply && Caret != t {
 		return false
 	}
@@ -69,73 +31,64 @@ func isOperation(t Tokens) bool {
 	return true
 }
 
-func SimplifyVariables1(tokens []Tokens, numbers []int, floatNumbers []float64) ([]Tokens, []int, []float64, error) {
-	var (
-		newTokens   []Tokens
-		newNumbers  []int
-		numberIndex int
-	)
 
-	numberIndex = 0
+
+
+func SimplifyVariables1(tokens []Token) ([]Token, error) {
+	var (
+		newTokens   []Token
+        number float64
+	)
 
 	for i := 0; i < len(tokens); i++ {
 
-		if tokens[i] == Variable {
+		if tokens[i].GetType() == Variable {
 			if i+1 == len(tokens) {
-				newTokens = append(newTokens, VariableDegree1)
+				newTokens = append(newTokens, Token{Kind: VariableDegree1})
 			} else {
 
-				if isOperation(tokens[i+1]) == false {
-					return nil, nil, nil, errors.New("Invalid equation operations must be after the variable")
+				if IsOperation(tokens[i+1]) == false {
+					return nil, errors.New("Invalid equation operations must be after the variable")
 				}
 
-				if tokens[i+1] == Caret {
-					if i+2 >= len(tokens) || tokens[i+2] != IntNumber {
-						return nil, nil, nil, errors.New("Invalid equation no number was provided after this \"^\"")
-					}
-
-					switch numbers[numberIndex] {
+				if tokens[i+1].GetType() == Caret {
+                    number, _ = tokens[i+2].NumericValue()
+					switch  number {
 					case 0:
-						newNumbers = append(newNumbers, 1)
-						newTokens = append(newTokens, IntNumber)
+						newTokens = append(newTokens, Token{Kind: FloatNumber, Value: 1})
 					case 1:
-						newTokens = append(newTokens, VariableDegree1)
+				        newTokens = append(newTokens, Token{Kind: VariableDegree1})
 					case 2:
-						newTokens = append(newTokens, VariableDegree2)
+				        newTokens = append(newTokens, Token{Kind: VariableDegree2})
 					default:
-						return nil, nil, nil, errors.New("we only solve second degree equations")
+						return nil, errors.New("we only solve second degree equations")
 					}
-					numberIndex++
 					i += 2
 				} else {
-					newTokens = append(newTokens, VariableDegree1)
+				    newTokens = append(newTokens, Token{Kind: VariableDegree1})
 				}
 			}
 
 		} else {
-			if tokens[i] == IntNumber {
-				newNumbers = append(newNumbers, numbers[numberIndex])
-				numberIndex++
-			}
 			newTokens = append(newTokens, tokens[i])
 		}
 	}
 
-	return newTokens, newNumbers, floatNumbers, nil
+	return newTokens,  nil
 }
 
-func SimplifyVariables2(tokens []Tokens) ([]Tokens, error) {
+func SimplifyVariables2(tokens []Token) ([]Token, error) {
 
 	var (
-		newTokens []Tokens
+		newTokens []Token
 	)
 
 	for i := 0; i < len(tokens); i++ {
-		if tokens[i] == Empty {
+		if tokens[i].GetType() == Empty {
 			continue
 		}
 
-		if tokens[i] == VariableDegree1 || tokens[i] == VariableDegree2 {
+		if tokens[i].GetType() == VariableDegree1 || tokens[i].GetType() == VariableDegree2 {
 			var (
 				oper   bool
 				degree int
@@ -150,19 +103,19 @@ func SimplifyVariables2(tokens []Tokens) ([]Tokens, error) {
 			j := i
 			for ; j < len(tokens); j++ {
 				if oper {
-					if tokens[j] != Multiply {
+					if tokens[j].GetType() != Multiply {
 						break
 					}
 				} else {
-					if degree == 1 && (tokens[j] == VariableDegree2 || tokens[j] == VariableDegree1) {
-						tokens[j-1] = Empty
+					if degree == 1 && (tokens[j].GetType() == VariableDegree2 || tokens[j].GetType() == VariableDegree1) {
+						tokens[j-1] = Token{Kind: Empty}
 					}
 
-					if tokens[j] == VariableDegree1 {
-						tokens[j] = Empty
+					if tokens[j].GetType() == VariableDegree1 {
+						tokens[j] = Token{Kind: Empty}
 						degree++
-					} else if tokens[j] == VariableDegree2 {
-						tokens[j] = Empty
+					} else if tokens[j].GetType() == VariableDegree2 {
+						tokens[j] = Token{Kind: Empty}
 						degree += 2
 					}
 
@@ -170,12 +123,11 @@ func SimplifyVariables2(tokens []Tokens) ([]Tokens, error) {
 
 				oper = !oper
 			}
-			//tokens[j - 2] = Empty
 
 			if degree == 1 {
-				newTokens = append(newTokens, VariableDegree1)
+				newTokens = append(newTokens, Token{Kind: VariableDegree1})
 			} else if degree == 2 {
-				newTokens = append(newTokens, VariableDegree2)
+				newTokens = append(newTokens, Token{Kind: VariableDegree2})
 			} else {
 				return nil, errors.New("we only solve second degree equations")
 			}
@@ -188,24 +140,19 @@ func SimplifyVariables2(tokens []Tokens) ([]Tokens, error) {
 
 }
 
-func SimplifyMultiplication(tokens []Tokens, numbers []int, floatNumbers []float64) ([]Tokens, []float64, error) {
+func SimplifyMultiplication(tokens []Token) ([]Token, error) {
 	var (
-		numberIndex int
-		floatIndex  int
-		newTokens   []Tokens
-		newNumbers  []float64
+		newTokens   []Token
+        number float64
 	)
-
-	floatIndex = 0
-	numberIndex = 0
 
 	for i := 0; i < len(tokens); i++ {
 
-		if tokens[i] == Empty {
+		if tokens[i].GetType() == Empty {
 			continue
 		}
 
-		if tokens[i] == IntNumber || tokens[i] == FloatNumber {
+		if tokens[i].GetType() == FloatNumber {
 
 			var (
 				oper   bool
@@ -214,103 +161,160 @@ func SimplifyMultiplication(tokens []Tokens, numbers []int, floatNumbers []float
 			oper = false
 			result = 1
 
-			if i+1 >= len(tokens) {
-
-				newTokens = append(newTokens, tokens[i])
-
-				if tokens[i] == IntNumber || tokens[i] == FloatNumber {
-                        // add last number 
-                        if tokens[i] == IntNumber {
-			                newNumbers = append(newNumbers, float64(numbers[numberIndex]))
-					    } else {
-			                newNumbers = append(newNumbers, float64(floatNumbers[floatIndex]))
-					    }   
-                }
-				break
-			}
-
 			for j := i; j < len(tokens); j++ {
 
 				if oper {
-					if tokens[j] != Multiply {
+					if tokens[j].GetType() != Multiply {
 						break
 					}
 				}
 
-				if tokens[j] == IntNumber || tokens[j] == FloatNumber {
-
-					if tokens[j] == IntNumber {
-						result = result * float64(numbers[numberIndex])
-						numberIndex++
-					} else {
-						result = result * float64(floatNumbers[floatIndex])
-						floatIndex++
-					}
-                    tokens[j] = Empty
-					if j > 0 && tokens[j-1] == Multiply {
-						tokens[j-1] = Empty
+				if tokens[j].GetType() == FloatNumber {
+                  
+			        number, _ = tokens[j]. NumericValue()
+					result = result * number 
+                    tokens[j] = Token{Kind: Empty}
+					if j > 0 && tokens[j-1].GetType() == Multiply {
+						tokens[j-1] = Token{Kind : Empty}
 					}
 				}
 
 				oper = !oper
 			}
-			newNumbers = append(newNumbers, result)
-			newTokens = append(newTokens, FloatNumber)
+			newTokens = append(newTokens, Token{Kind: FloatNumber, Value: result})
 
 		} else {
 			newTokens = append(newTokens, tokens[i])
 		}
 	}
-	return newTokens, newNumbers, nil
+	return newTokens, nil
 
 }
 
 
-func SimplifyAddition(tokens []Tokens, floatNumbers []float64) ([]Tokens, []float64, error) {
+func SimplifyAddition(tokens []Token) ([]Token, error) {
 
-	var (
-		numberIndex int
-	)
-
-	numberIndex = 0
+    
     for i := 0; i < len(tokens); i++{
-        if tokens[i] == FloatNumber {
-
-            if i > 0 && tokens[i - 1] == Minus{
-                tokens[i - 1] = Plus
-                floatNumbers[numberIndex] = -floatNumbers[numberIndex]
+        if tokens[i].GetType() == FloatNumber {
+            if i > 0 && tokens[i - 1].GetType() == Minus{
+                tokens[i - 1] = Token{Kind : Plus} 
+                tokens[i].ChangeSign() 
             }
-            numberIndex++
         }
     }
 
     for i := 0; i < len(tokens); i++{
-        if tokens[i] == VariableDegree2 || tokens[i] == VariableDegree1 {
+        if tokens[i].GetType() == VariableDegree2 || tokens[i].GetType() == VariableDegree1 {
 
-            if i > 0 && tokens[i - 1] == Minus{
-                tokens[i - 1] = Plus
-                if VariableDegree2 == tokens[i] {
-                    tokens[i] = VariableDegree2Negatif
+            if i > 0 && tokens[i - 1].GetType() == Minus{
+                tokens[i - 1] = Token{Kind: Plus}
+                if VariableDegree2 == tokens[i].GetType() {
+                    tokens[i] = Token{Kind: VariableDegree2Negatif}
 
                 }else {
-
-                    tokens[i] = VariableDegree1Negatif
+                    tokens[i] = Token{Kind: VariableDegree1Negatif}
                 }
             }
         }
     }
 
-    return tokens, floatNumbers, nil
+    return tokens, nil
 
 }
 
 
+func ReduceVersion(tokens []Token ) ([]Token, error) {
+    var (
+        equ map[string]float64
+        state TokenType
+        number float64
+    )
 
-func Parse(input string) ([]Tokens, []int, []float64, error) {
+    equ = make(map[string]float64)
+
+    equ["X^1"] = 0
+    equ["X^2"] = 0
+    equ["C"] = 0
+
+
+    for i := 0; i < len(tokens); i++{
+
+        if tokens[i].GetType() != Multiply {
+            continue
+        }
+        
+        if IsVariable(tokens[i - 1]) {
+            state = tokens[i -1].GetType()
+            number, _ = tokens[i + 1].NumericValue() 
+        }else{
+            state = tokens[i + 1].GetType()
+            number, _ = tokens[i - 1].NumericValue() 
+        }
+
+        tokens[i + 1] = Token{Kind: Empty}
+        tokens[i - 1] = Token{Kind: Empty}
+        tokens[i] = Token{Kind: Empty}
+
+        if state == VariableDegree1 {
+            equ["X^1"] += number 
+        }
+        if state == VariableDegree2 {
+            equ["X^2"] += number 
+        }
+    
+        if state == VariableDegree2Negatif {
+            if number < 0 {
+                equ["X^2"] += (-number)
+            }else {
+                equ["X^2"] += number
+            }
+        }
+
+        if state == VariableDegree1Negatif {
+            if number < 0 {
+                equ["X^1"] += (-number)
+            }else {
+                equ["X^1"] += number
+            }
+        }
+    }
+
+    for i := 0; i < len(tokens); i++{
+        if IsVariable(tokens[i]) == false{
+            continue
+        }
+
+        switch tokens[i].GetType(){
+            case VariableDegree1:
+                equ["X^1"] += 1 
+            case VariableDegree2:
+                equ["X^2"] += 1 
+            case VariableDegree2Negatif:
+                equ["X^2"] -= 1 
+            case VariableDegree1Negatif:
+                equ["X^1"] -= 1 
+         }
+
+        tokens[i] = Token{Kind: Empty}
+        }
+
+    for i := 0; i < len(tokens); i++{
+        if nbr, ok := tokens[i].NumericValue(); ok == true{
+            equ["c"]+= nbr
+        }
+    }
+
+    fmt.Printf("X^1 * %.2f + X ^2 * %.2f + (%.2f)", equ["X^1"],equ["X^2"], equ["c"])
+
+    return nil, nil 
+}
+
+
+
+func Parse(input string) ([]Token, error) {
 	var (
-		tokens       []Tokens
-		numbers      []int
-		floatNumbers []float64
+		tokens       []Token
 	)
 
 	for i := 0; i < len(input); i++ {
@@ -319,8 +323,8 @@ func Parse(input string) ([]Tokens, []int, []float64, error) {
 			continue
 		}
 
-		if val, ok := TokenState[string(input[i])]; ok == true {
-			tokens = append(tokens, val)
+		if _ , ok := TokenState[string(input[i])]; ok == true {
+			tokens = append(tokens, Token{Kind: TokenState[string(input[i])]})
 
 		} else {
 			// treating the number
@@ -341,90 +345,102 @@ func Parse(input string) ([]Tokens, []int, []float64, error) {
 			}
 			e = i
 			if isFloat == true {
-				tokens = append(tokens, FloatNumber)
 				val, err := strconv.ParseFloat(input[s:e], 32)
 
 				if err != nil {
 					fmt.Println(input[s:e], s, e)
 					Fatal("error parssing number")
 				}
-				floatNumbers = append(floatNumbers, float64(val))
-
+				tokens = append(tokens, Token{Kind: FloatNumber, Value: float64(val) })
 			} else {
-
-				tokens = append(tokens, IntNumber)
 				val, err := strconv.Atoi(input[s:e])
 				if err != nil {
 					fmt.Println(input[s:e], s, e)
 					Fatal("error parssing number")
 				}
-				numbers = append(numbers, val)
+				tokens = append(tokens, Token{Kind: FloatNumber, Value: float64(val) })
 			}
 			i--
 		}
 	}
 
-	return tokens, numbers, floatNumbers, nil
+	return tokens, nil
 }
 
-func dbg(tokens []Tokens, numbers []int, floatNumbers []float64) {
+func dbg(tokens []Token) {
 
-	j := 0
-	k := 0
 	fmt.Printf("dbgV1:")
 	for i := 0; i < len(tokens); i++ {
-		val, ok := TokenStr[tokens[i]]
+		val, ok := TokenStr[tokens[i].GetType()]
 		if ok == true {
 			fmt.Printf(" %s ", val)
-		} else if tokens[i] == IntNumber {
-			fmt.Printf(" %d ", numbers[j])
-			j++
-		} else {
-			fmt.Printf(" %.2f ", floatNumbers[k])
-			k++
+		} else  {
+            nbr, _ := tokens[i].NumericValue() 
+			fmt.Printf(" %f ", nbr)
 		}
 	}
 	fmt.Println()
 
 }
 
-func dbgV2(tokens []Tokens, floatNumbers []float64) {
 
-	k := 0
+func PrintTokens(tokens []Token) {
 
 	fmt.Printf("dbgV2:")
 	for i := 0; i < len(tokens); i++ {
-		val, ok := TokenStr[tokens[i]]
+		val, ok := TokenStr[tokens[i].GetType()]
 		if ok == true {
 			fmt.Printf(" %s ", val)
 		} else {
-            if floatNumbers[k] < 0 {
-			    fmt.Printf(" (%.2f) ", floatNumbers[k])
+            nbr, _ := tokens[i].NumericValue() 
+            if nbr < 0 {
+			    fmt.Printf(" (%.2f) ", nbr)
             }else {
-			fmt.Printf(" %.2f ", floatNumbers[k])
+			fmt.Printf(" %.2f ", nbr)
             }
-			k++
 		}
 	}
 
 	fmt.Println()
 
 }
+
+func dbgV2(tokens []Token) {
+
+
+	fmt.Printf("dbgV2:")
+	for i := 0; i < len(tokens); i++ {
+		val, ok := TokenStr[tokens[i].GetType()]
+		if ok == true {
+			fmt.Printf(" %s ", val)
+		} else {
+
+            nbr, _ := tokens[i].NumericValue() 
+            if nbr < 0 {
+			    fmt.Printf(" (%.2f) ", nbr)
+            }else {
+			fmt.Printf(" %.2f ", nbr)
+            }
+		}
+	}
+
+	fmt.Println()
+
+}
+
 func main() {
 
 	var (
-		tokens       []Tokens
-		numbers      []int
-		floatNumbers []float64
+		tokens       []Token
 	)
 
 	if len(os.Args) != 2 {
 		Fatal("we need 2 arguments")
 	}
 
-	tokens, numbers, floatNumbers, _ = Parse(os.Args[1])
+	tokens, _ = Parse(os.Args[1])
 
-	tokens, numbers, floatNumbers, err := SimplifyVariables1(tokens, numbers, floatNumbers)
+	tokens,  err := SimplifyVariables1(tokens)
 
 	if err != nil {
 		Fatal(err.Error())
@@ -434,10 +450,12 @@ func main() {
 	if err != nil {
 		Fatal(err.Error())
 	}
-	dbg(tokens, numbers, floatNumbers)
+	dbg(tokens)
 
-	tokens, floatNumbers, _ = SimplifyMultiplication(tokens, numbers, floatNumbers)
-    tokens, floatNumbers,_ = SimplifyAddition(tokens, floatNumbers)
-	dbgV2(tokens, floatNumbers)
+	tokens,  _ = SimplifyMultiplication(tokens )
+    tokens,_ = SimplifyAddition(tokens)
+
+	dbgV2(tokens)
+    tokens, _ = ReduceVersion(tokens)
 
 }
