@@ -1,13 +1,134 @@
 package main
 
 import (
-	"errors"
+//	"errors"
 	"fmt"
 	"os"
 	"strconv"
 	"unicode"
 )
 
+
+
+
+
+
+// F = X | Number 
+func ParseFactor(token []Token, cur *int) (TreeNode){
+    fmt.Println("---Parse Factor ---")
+
+    if *cur >= len(token) {
+        return nil
+
+    }
+
+    var (
+        t TokenType
+    )
+
+    // we still don't know if we need to validate negatif number
+    t = token[*cur].GetType()
+
+    if t !=  FloatNumber && t !=  Variable && t!= VariableNeg{
+        return nil
+     }
+
+
+    
+    if t ==  FloatNumber{
+        val, _ := token[*cur].NumericValue()
+        (*cur)++
+        return NewVal(val)
+    } 
+
+    if t ==  Variable {
+        (*cur)++
+        return  NewVar(false, 1)
+    }
+
+    if t ==  VariableNeg {
+        (*cur)++
+
+        return  NewVar(true, 1)
+    }
+    
+    return nil
+}
+
+// T = F * T | F ^ T | F | F T 
+func ParseTerm(token []Token, cur *int) (TreeNode){
+
+    fmt.Println("---Parse Term---")
+    var (
+        a TreeNode
+        b TreeNode
+        t TokenType
+    )
+
+    a = ParseFactor(token, cur)
+
+    if *cur >= len(token) {
+        return a
+    }
+
+    t = token[*cur].GetType()
+
+    if t == Multiply {
+        (*cur)++
+        b = ParseTerm(token, cur)
+
+        return NewOpr(a, b, Multiply)
+    } else if t == Caret{
+        (*cur)++
+        b = ParseTerm(token, cur )
+        fmt.Println(">>", b,"|", NewOpr(a, b, Caret))
+
+        return NewOpr(a, b, Caret)
+    }
+
+    return a 
+}
+
+
+// E =  T {+|- T} 
+
+func ParseExpression(token []Token, cur *int) (TreeNode){
+
+    fmt.Println("---Parse Expression---")
+    var (
+        a TreeNode
+        b TreeNode
+        t TokenType
+    )
+
+    a = ParseTerm(token, cur)
+
+    for ;; {
+        if *cur >= len(token){
+
+            return a 
+        }
+        t = token[*cur].GetType()
+
+
+        if t == Plus {
+            (*cur)++
+            b = ParseTerm(token, cur)
+            a = NewOpr(a, b, Plus)
+        }else if t == Minus{
+            (*cur)++
+            b = ParseTerm(token, cur)
+            a = NewOpr(a, b, Minus )
+        } else {
+
+            return a
+        }
+    }
+
+
+
+    return nil 
+}
 
 
 
@@ -29,285 +150,6 @@ func IsOperation(token Token) bool {
 	}
 
 	return true
-}
-
-
-
-
-func SimplifyVariables1(tokens []Token) ([]Token, error) {
-	var (
-		newTokens   []Token
-        number float64
-	)
-
-	for i := 0; i < len(tokens); i++ {
-
-		if tokens[i].GetType() == Variable {
-			if i+1 == len(tokens) {
-				newTokens = append(newTokens, Token{Kind: VariableDegree1})
-			} else {
-
-				if IsOperation(tokens[i+1]) == false {
-					return nil, errors.New("Invalid equation operations must be after the variable")
-				}
-
-				if tokens[i+1].GetType() == Caret {
-                    number, _ = tokens[i+2].NumericValue()
-					switch  number {
-					case 0:
-						newTokens = append(newTokens, Token{Kind: FloatNumber, Value: 1})
-					case 1:
-				        newTokens = append(newTokens, Token{Kind: VariableDegree1})
-					case 2:
-				        newTokens = append(newTokens, Token{Kind: VariableDegree2})
-					default:
-						return nil, errors.New("we only solve second degree equations")
-					}
-					i += 2
-				} else {
-				    newTokens = append(newTokens, Token{Kind: VariableDegree1})
-				}
-			}
-
-		} else {
-			newTokens = append(newTokens, tokens[i])
-		}
-	}
-
-	return newTokens,  nil
-}
-
-func SimplifyVariables2(tokens []Token) ([]Token, error) {
-
-	var (
-		newTokens []Token
-	)
-
-	for i := 0; i < len(tokens); i++ {
-		if tokens[i].GetType() == Empty {
-			continue
-		}
-
-		if tokens[i].GetType() == VariableDegree1 || tokens[i].GetType() == VariableDegree2 {
-			var (
-				oper   bool
-				degree int
-			)
-			oper = false
-			degree = 0
-
-			if i+1 >= len(tokens) {
-				newTokens = append(newTokens, tokens[i])
-				break
-			}
-			j := i
-			for ; j < len(tokens); j++ {
-				if oper {
-					if tokens[j].GetType() != Multiply {
-						break
-					}
-				} else {
-					if degree == 1 && (tokens[j].GetType() == VariableDegree2 || tokens[j].GetType() == VariableDegree1) {
-						tokens[j-1] = Token{Kind: Empty}
-					}
-
-					if tokens[j].GetType() == VariableDegree1 {
-						tokens[j] = Token{Kind: Empty}
-						degree++
-					} else if tokens[j].GetType() == VariableDegree2 {
-						tokens[j] = Token{Kind: Empty}
-						degree += 2
-					}
-
-				}
-
-				oper = !oper
-			}
-
-			if degree == 1 {
-				newTokens = append(newTokens, Token{Kind: VariableDegree1})
-			} else if degree == 2 {
-				newTokens = append(newTokens, Token{Kind: VariableDegree2})
-			} else {
-				return nil, errors.New("we only solve second degree equations")
-			}
-
-		} else {
-			newTokens = append(newTokens, tokens[i])
-		}
-	}
-	return newTokens, nil
-
-}
-
-func SimplifyMultiplication(tokens []Token) ([]Token, error) {
-	var (
-		newTokens   []Token
-        number float64
-	)
-
-	for i := 0; i < len(tokens); i++ {
-
-		if tokens[i].GetType() == Empty {
-			continue
-		}
-
-		if tokens[i].GetType() == FloatNumber {
-
-			var (
-				oper   bool
-				result float64
-			)
-			oper = false
-			result = 1
-
-			for j := i; j < len(tokens); j++ {
-
-				if oper {
-					if tokens[j].GetType() != Multiply {
-						break
-					}
-				}
-
-				if tokens[j].GetType() == FloatNumber {
-                  
-			        number, _ = tokens[j]. NumericValue()
-					result = result * number 
-                    tokens[j] = Token{Kind: Empty}
-					if j > 0 && tokens[j-1].GetType() == Multiply {
-						tokens[j-1] = Token{Kind : Empty}
-					}
-				}
-
-				oper = !oper
-			}
-			newTokens = append(newTokens, Token{Kind: FloatNumber, Value: result})
-
-		} else {
-			newTokens = append(newTokens, tokens[i])
-		}
-	}
-	return newTokens, nil
-
-}
-
-
-func SimplifyAddition(tokens []Token) ([]Token, error) {
-
-    
-    for i := 0; i < len(tokens); i++{
-        if tokens[i].GetType() == FloatNumber {
-            if i > 0 && tokens[i - 1].GetType() == Minus{
-                tokens[i - 1] = Token{Kind : Plus} 
-                tokens[i].ChangeSign() 
-            }
-        }
-    }
-
-    for i := 0; i < len(tokens); i++{
-        if tokens[i].GetType() == VariableDegree2 || tokens[i].GetType() == VariableDegree1 {
-
-            if i > 0 && tokens[i - 1].GetType() == Minus{
-                tokens[i - 1] = Token{Kind: Plus}
-                if VariableDegree2 == tokens[i].GetType() {
-                    tokens[i] = Token{Kind: VariableDegree2Negatif}
-
-                }else {
-                    tokens[i] = Token{Kind: VariableDegree1Negatif}
-                }
-            }
-        }
-    }
-
-    return tokens, nil
-
-}
-
-
-func ReduceVersion(tokens []Token ) ([]Token, error) {
-    var (
-        equ map[string]float64
-        state TokenType
-        number float64
-    )
-
-    equ = make(map[string]float64)
-
-    equ["X^1"] = 0
-    equ["X^2"] = 0
-    equ["C"] = 0
-
-
-    for i := 0; i < len(tokens); i++{
-
-        if tokens[i].GetType() != Multiply {
-            continue
-        }
-        
-        if IsVariable(tokens[i - 1]) {
-            state = tokens[i -1].GetType()
-            number, _ = tokens[i + 1].NumericValue() 
-        }else{
-            state = tokens[i + 1].GetType()
-            number, _ = tokens[i - 1].NumericValue() 
-        }
-
-        tokens[i + 1] = Token{Kind: Empty}
-        tokens[i - 1] = Token{Kind: Empty}
-        tokens[i] = Token{Kind: Empty}
-
-        if state == VariableDegree1 {
-            equ["X^1"] += number 
-        }
-        if state == VariableDegree2 {
-            equ["X^2"] += number 
-        }
-    
-        if state == VariableDegree2Negatif {
-            if number < 0 {
-                equ["X^2"] += (-number)
-            }else {
-                equ["X^2"] += number
-            }
-        }
-
-        if state == VariableDegree1Negatif {
-            if number < 0 {
-                equ["X^1"] += (-number)
-            }else {
-                equ["X^1"] += number
-            }
-        }
-    }
-
-    for i := 0; i < len(tokens); i++{
-        if IsVariable(tokens[i]) == false{
-            continue
-        }
-
-        switch tokens[i].GetType(){
-            case VariableDegree1:
-                equ["X^1"] += 1 
-            case VariableDegree2:
-                equ["X^2"] += 1 
-            case VariableDegree2Negatif:
-                equ["X^2"] -= 1 
-            case VariableDegree1Negatif:
-                equ["X^1"] -= 1 
-         }
-
-        tokens[i] = Token{Kind: Empty}
-        }
-
-    for i := 0; i < len(tokens); i++{
-        if nbr, ok := tokens[i].NumericValue(); ok == true{
-            equ["c"]+= nbr
-        }
-    }
-
-    fmt.Printf("X^1 * %.2f + X ^2 * %.2f + (%.2f)", equ["X^1"],equ["X^2"], equ["c"])
-
-    return nil, nil 
 }
 
 
@@ -367,43 +209,6 @@ func Parse(input string) ([]Token, error) {
 	return tokens, nil
 }
 
-func dbg(tokens []Token) {
-
-	fmt.Printf("dbgV1:")
-	for i := 0; i < len(tokens); i++ {
-		val, ok := TokenStr[tokens[i].GetType()]
-		if ok == true {
-			fmt.Printf(" %s ", val)
-		} else  {
-            nbr, _ := tokens[i].NumericValue() 
-			fmt.Printf(" %f ", nbr)
-		}
-	}
-	fmt.Println()
-
-}
-
-
-func PrintTokens(tokens []Token) {
-
-	fmt.Printf("dbgV2:")
-	for i := 0; i < len(tokens); i++ {
-		val, ok := TokenStr[tokens[i].GetType()]
-		if ok == true {
-			fmt.Printf(" %s ", val)
-		} else {
-            nbr, _ := tokens[i].NumericValue() 
-            if nbr < 0 {
-			    fmt.Printf(" (%.2f) ", nbr)
-            }else {
-			fmt.Printf(" %.2f ", nbr)
-            }
-		}
-	}
-
-	fmt.Println()
-
-}
 
 func dbgV2(tokens []Token) {
 
@@ -428,11 +233,78 @@ func dbgV2(tokens []Token) {
 
 }
 
+
+func PrintTree(node TreeNode) {
+
+    //fmt.Println("---Print Tree---")
+    var (
+       cur OpNode
+    )
+    
+    if node == nil {
+        return
+    }
+    cur, ok := node.(OpNode) 
+
+    if ok {
+        PrintTree(cur.L)
+        
+        fmt.Printf("%s\n",  cur)
+        PrintTree(cur.R)
+
+    } else {
+        return
+    }
+
+   
+    
+    
+
+}
+
+
+func SimplifyEquation(tokens []Token) []Token{
+    var (
+        newTokens []Token
+    )
+    for i := 0; i < len(tokens); i++{
+        if tokens[i].GetType() == Minus{
+            tokens[i].Kind = Plus
+            tokens[i + 1].ChangeSign()
+        }
+    }
+
+    for i := 0; i < len(tokens); i++{
+        if tokens[i].GetType() == Variable || tokens[i].GetType() == VariableNeg {
+           
+
+
+           if i > 0 && i + 1 < len(tokens) && tokens[i - 1].GetType() == FloatNumber && tokens[i + 1].GetType() == FloatNumber {
+                newTokens = append(newTokens, Token{Kind: Multiply})
+                newTokens = append(newTokens, tokens[i])
+                newTokens = append(newTokens, Token{Kind: Multiply})
+           }else if i + 1 < len(tokens) && tokens[i + 1].GetType() == FloatNumber {
+                newTokens = append(newTokens, tokens[i])
+                newTokens = append(newTokens, Token{Kind: Multiply})
+            } else if i > 0 && tokens[i - 1].GetType() == FloatNumber{
+                newTokens = append(newTokens, Token{Kind: Multiply})
+                newTokens = append(newTokens, tokens[i])
+            }
+        }else {
+            newTokens = append(newTokens, tokens[i])
+        }
+    }
+    return newTokens
+}
+
 func main() {
 
 	var (
 		tokens       []Token
+		node        TreeNode
+        cur             int
 	)
+    cur = 0
 
 	if len(os.Args) != 2 {
 		Fatal("we need 2 arguments")
@@ -440,22 +312,13 @@ func main() {
 
 	tokens, _ = Parse(os.Args[1])
 
-	tokens,  err := SimplifyVariables1(tokens)
-
-	if err != nil {
-		Fatal(err.Error())
-	}
-
-	tokens, err = SimplifyVariables2(tokens)
-	if err != nil {
-		Fatal(err.Error())
-	}
-	dbg(tokens)
-
-	tokens,  _ = SimplifyMultiplication(tokens )
-    tokens,_ = SimplifyAddition(tokens)
+	dbgV2(tokens)
+    tokens = SimplifyEquation(tokens)
+    node = ParseExpression(tokens,&cur)
+    fmt.Println("--- Print tree --- ")
+    //PrintTree(node)
+    fmt.Println(node)
+    fmt.Println()
 
 	dbgV2(tokens)
-    tokens, _ = ReduceVersion(tokens)
-
 }

@@ -16,11 +16,8 @@ const (
 	IntNumber
 	FloatNumber
 	Variable
-	VariableDegree1
-	VariableDegree2
+    VariableNeg
 	Empty
-    VariableDegree2Negatif
-    VariableDegree1Negatif
 )
 
 var TokenState = map[string]TokenType{
@@ -29,11 +26,7 @@ var TokenState = map[string]TokenType{
 	"*":   Multiply,
 	"^":   Caret,
 	"X":   Variable,
-	"x":   Variable,
-	"x^2": VariableDegree2,
-	"x^1": VariableDegree1,
-	"(-x^2)": VariableDegree2Negatif,
-	"(-x^1)": VariableDegree1Negatif,
+    "(-X)":VariableNeg,
 }
 
 var TokenStr = map[TokenType]string{
@@ -42,17 +35,14 @@ var TokenStr = map[TokenType]string{
 	Multiply:        "*",
 	Caret:           "^",
 	Variable:        "X",
-	VariableDegree2: "x^2",
-	VariableDegree1: "x^1",
-    VariableDegree2Negatif: "(-x^2)",
-    VariableDegree1Negatif: "(-x^1)",
+    VariableNeg: "(-x)",
 }
 
 
 func IsVariable(token Token) bool {
 
     t := token.GetType()
-    if t != Variable && t != VariableDegree1 && t != VariableDegree2 && VariableDegree2Negatif != t && t != VariableDegree1Negatif {
+    if t != Variable && t != VariableNeg {
 		return false
 	}
 
@@ -82,7 +72,11 @@ func (t *Token) NumericValue() (float64, bool) {
 func (t *Token) ChangeSign(){
     if t.Kind == FloatNumber {
         t.Value =  -t.Value
-     }
+     } else if t.Kind == Variable{
+        t.Kind = VariableNeg
+    } else  if t.Kind == VariableNeg{
+        t.Kind = Variable
+    }
 }
 
 
