@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"unicode"
+	"sort"
 )
 
 
@@ -13,7 +14,7 @@ import (
 
 
 
-// F = X | Number  | X ^ NUMBER
+// F = X | Number | X * CARET  
 func ParseFactor(token []Token, cur *int) (TreeNode){
 
     if *cur >= len(token) {
@@ -30,31 +31,47 @@ func ParseFactor(token []Token, cur *int) (TreeNode){
 
     if t !=  FloatNumber && t !=  Variable && t!= VariableNeg{
         return nil
-     }
+    }
 
 
     
     if t ==  FloatNumber{
         val, _ := token[*cur].NumericValue()
         (*cur)++
+		if (*cur) + 1 < len(token) && token[*cur].GetType() == Caret {
+			(*cur)++
+			return NewOpr(NewVal(val), ParseFactor(token, cur), Caret)
+		}
         return NewVal(val)
     } 
 
+	// check for ^ 
     if t ==  Variable {
         (*cur)++
+	
+		if (*cur) + 1 < len(token) && token[*cur].GetType() == Caret {
+			(*cur)++
+			return NewOpr(NewVar(1, 1), ParseFactor(token, cur), Caret)
+		}
         return  NewVar(1, 1)
     }
 
     if t ==  VariableNeg {
         (*cur)++
-
+		if (*cur) + 1 < len(token) && token[*cur].GetType() == Caret {
+			(*cur)++
+			return NewOpr(NewVar(1, -1), ParseFactor(token, cur), Caret)
+		}
         return  NewVar(1, -1)
     }
     
     return nil
 }
 
-// T = F * T | F ^ T | F | F T 
+// P = F ^  NUMBER
+
+
+// T = F * T |  F  
 func ParseTerm(token []Token, cur *int) (TreeNode){
 
     var (
@@ -79,7 +96,6 @@ func ParseTerm(token []Token, cur *int) (TreeNode){
     } else if t == Caret{
         (*cur)++
         b = ParseTerm(token, cur )
-        fmt.Println(">>", b,"|", NewOpr(a, b, Caret))
 
         return NewOpr(a, b, Caret)
     }
@@ -112,10 +128,6 @@ func ParseExpression(token []Token, cur *int) (TreeNode){
             (*cur)++
             b = ParseTerm(token, cur)
             a = NewOpr(a, b, Plus)
-        }else if t == Minus{
-            (*cur)++
-            b = ParseTerm(token, cur)
-            a = NewOpr(a, b, Minus )
         } else {
 
             return a
@@ -286,12 +298,37 @@ func CalculateTree(root TreeNode) Result{
     return Result{}
 }
 
+// calculate the reduce form
+
+func ReduceForm(c float64){
+ 	// StackOfVar 
+	var (
+		mp map[int]float64
+	)
+	mp = make(map[int]float64)
+	for i := 0; i < len(StackOfVar); i++{
+		mp[StackOfVar[i].Degree] += StackOfVar[i].Factor 
+	}
+
+	fmt.Println("-- Reduced Form --")
+	for k,  _ := range(mp){
+		keys = append(k, keys)
+	}
+	sort.
+	for k, val := range(mp){
+		fmt.Printf("%.2f * X^ %d +", val, k)
+	}
+	fmt.Println(c)
+
+}
+
 func main() {
 
 	var (
 		tokens       []Token
 		node        TreeNode
         cur             int
+		c				float64
 	)
     cur = 0
 
@@ -310,8 +347,9 @@ func main() {
 
     if res,ok := node.(*OpNode); ok {
         fmt.Println("c = ",res.Res.NumberResult)
-    }
-
-        fmt.Println(StackOfVar)
+		c = res.Res.NumberResult
+	}
+	ReduceForm(c)
+    //    fmt.Println(StackOfVar)
 	//dbgV2(tokens)
 }
