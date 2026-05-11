@@ -13,9 +13,8 @@ import (
 
 
 
-// F = X | Number 
+// F = X | Number  | X ^ NUMBER
 func ParseFactor(token []Token, cur *int) (TreeNode){
-    fmt.Println("---Parse Factor ---")
 
     if *cur >= len(token) {
         return nil
@@ -43,13 +42,13 @@ func ParseFactor(token []Token, cur *int) (TreeNode){
 
     if t ==  Variable {
         (*cur)++
-        return  NewVar(false, 1)
+        return  NewVar(1, 1)
     }
 
     if t ==  VariableNeg {
         (*cur)++
 
-        return  NewVar(true, 1)
+        return  NewVar(1, -1)
     }
     
     return nil
@@ -58,7 +57,6 @@ func ParseFactor(token []Token, cur *int) (TreeNode){
 // T = F * T | F ^ T | F | F T 
 func ParseTerm(token []Token, cur *int) (TreeNode){
 
-    fmt.Println("---Parse Term---")
     var (
         a TreeNode
         b TreeNode
@@ -94,7 +92,6 @@ func ParseTerm(token []Token, cur *int) (TreeNode){
 
 func ParseExpression(token []Token, cur *int) (TreeNode){
 
-    fmt.Println("---Parse Expression---")
     var (
         a TreeNode
         b TreeNode
@@ -235,31 +232,9 @@ func dbgV2(tokens []Token) {
 
 
 func PrintTree(node TreeNode) {
-
-    //fmt.Println("---Print Tree---")
-    var (
-       cur OpNode
-    )
-    
-    if node == nil {
-        return
-    }
-    cur, ok := node.(OpNode) 
-
-    if ok {
-        PrintTree(cur.L)
-        
-        fmt.Printf("%s\n",  cur)
-        PrintTree(cur.R)
-
-    } else {
-        return
-    }
-
-   
-    
-    
-
+    fmt.Println("---Print Tree---")
+    fmt.Println(node)
+    fmt.Println()
 }
 
 
@@ -276,9 +251,6 @@ func SimplifyEquation(tokens []Token) []Token{
 
     for i := 0; i < len(tokens); i++{
         if tokens[i].GetType() == Variable || tokens[i].GetType() == VariableNeg {
-           
-
-
            if i > 0 && i + 1 < len(tokens) && tokens[i - 1].GetType() == FloatNumber && tokens[i + 1].GetType() == FloatNumber {
                 newTokens = append(newTokens, Token{Kind: Multiply})
                 newTokens = append(newTokens, tokens[i])
@@ -289,12 +261,29 @@ func SimplifyEquation(tokens []Token) []Token{
             } else if i > 0 && tokens[i - 1].GetType() == FloatNumber{
                 newTokens = append(newTokens, Token{Kind: Multiply})
                 newTokens = append(newTokens, tokens[i])
+            } else {
+                newTokens = append(newTokens, tokens[i])
             }
         }else {
             newTokens = append(newTokens, tokens[i])
         }
     }
     return newTokens
+}
+
+
+func CalculateTree(root TreeNode) Result{
+    if root == nil {
+        return Result{}
+    }
+
+    if node, ok := root.(*OpNode); ok {
+        CalculateTree(node.L)
+        CalculateTree(node.R)
+        node.Res = node.Eval()
+    }
+
+    return Result{}
 }
 
 func main() {
@@ -312,13 +301,17 @@ func main() {
 
 	tokens, _ = Parse(os.Args[1])
 
-	dbgV2(tokens)
     tokens = SimplifyEquation(tokens)
-    node = ParseExpression(tokens,&cur)
-    fmt.Println("--- Print tree --- ")
-    //PrintTree(node)
-    fmt.Println(node)
-    fmt.Println()
 
 	dbgV2(tokens)
+    node = ParseExpression(tokens,&cur)
+    PrintTree(node)
+    CalculateTree(node)
+
+    if res,ok := node.(*OpNode); ok {
+        fmt.Println("c = ",res.Res.NumberResult)
+    }
+
+        fmt.Println(StackOfVar)
+	//dbgV2(tokens)
 }

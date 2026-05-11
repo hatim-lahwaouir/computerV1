@@ -4,30 +4,114 @@ package main
 import (
     "math"
     "fmt"
-
 )
+
+
+var StackOfVar []Var 
+
+
+type Result struct {
+    IsVar bool
+    VarResult Var
+    NumberResult float64 
+}
+
+
+func (l Result) Add(r Result) Result {
+    if l.IsVar == false && r.IsVar == false{
+
+        return Result{IsVar: false, NumberResult: l.NumberResult + r.NumberResult}
+    } else {
+
+        if l.IsVar && r.IsVar && r.VarResult.Degree ==  l.VarResult.Degree{
+            fmt.Println(">>", r, l)
+            return l.VarResult.Add(r.VarResult) 
+        }else if l.IsVar && r.IsVar && r.VarResult.Degree !=  l.VarResult.Degree{
+
+            StackOfVar = append(StackOfVar,r.VarResult)
+            StackOfVar = append(StackOfVar,l.VarResult)
+        }else if l.IsVar {
+
+            StackOfVar = append(StackOfVar,l.VarResult)
+            return r
+        }else {
+
+
+            StackOfVar = append(StackOfVar,r.VarResult)
+            return l
+        }
+
+            fmt.Println("here", l, r)
+
+    }
+    return Result{}
+}
+
+func (l Result) Multiplication(r Result) Result {
+    if l.IsVar == false && r.IsVar == false{
+        return Result{IsVar: false, NumberResult: l.NumberResult * r.NumberResult}
+    } else {
+        if l.IsVar && r.IsVar {
+            return l.VarResult.Multiplication(r.VarResult) 
+        }else if l.IsVar {
+            return l.VarResult.MultiplyByFactor(r.NumberResult)
+        }else {
+            return r.VarResult.MultiplyByFactor(l.NumberResult)
+        }
+    }
+    return Result{}
+}
+
+
+func (l Result) CaretOperation(r Result) Result {
+    if l.IsVar == false && r.IsVar == false{
+        return Result{IsVar: false, NumberResult: math.Pow(l.NumberResult , r.NumberResult)}
+    } else {
+        if l.IsVar {
+            fmt.Println(">>>> ^ ", l, r)
+            return l.VarResult.SetDegree(int(r.NumberResult)) 
+        }
+    }
+    return Result{}
+}
 
 
 type Var struct {
     Degree int 
-    Negatif bool 
+    Factor float64 
 }
 
-func NewVar(negatif bool, dg int) TreeNode{
-    return Var{ Degree: dg, Negatif: negatif}
-
+func NewVar(dg int, Factor float64) TreeNode{
+    return &Var{ Degree: dg,Factor: Factor}
 }
 
-func (o Var) Eval() float64{
-    return 0 
+func (o *Var) Eval() Result{
+    return Result{IsVar: true, VarResult: *o}
 }
+
+func (l Var) Add(r Var) Result{
+    return Result {IsVar: true, VarResult: Var{r.Degree, l.Factor + r.Factor}}
+}
+
+func (l Var) Multiplication(r Var) Result{
+    return Result {IsVar: true, VarResult: Var{r.Degree + l.Degree, l.Factor * r.Factor}}
+}
+
+func (l Var) SetDegree(degree int) Result{
+    return Result {IsVar: true, VarResult: Var{degree, l.Factor}}
+}
+
+func (l Var) MultiplyByFactor(factor float64) Result{
+    return Result {IsVar: true, VarResult: Var{l.Degree, l.Factor * factor}}
+}
+
+
 
 func (o Var) String() string{
-    if o.Negatif == true{
-        return fmt.Sprintf("(-x)^%d", o.Degree)
+    if o.Factor <  0 {
+        return fmt.Sprintf("(%.2f * x^%d)",o.Factor ,o.Degree)
     }
-
-    return fmt.Sprintf("(x)^%d", o.Degree)
+    return fmt.Sprintf("(%.2f * x^%d)", o.Factor, o.Degree)
 }
 
 func (o Var) GetKind() TokenType{
@@ -39,8 +123,8 @@ type Value struct {
     Val float64 
 }
 
-func (o Value) Eval() float64{
-    return o.Val
+func (o *Value) Eval() Result{
+    return Result{IsVar: false, NumberResult : o.Val}
 }
 
 func (o Value) String() string{
@@ -55,8 +139,15 @@ func (o Value) GetKind() TokenType{
     return FloatNumber 
 }
 
+func NewVal(val float64) TreeNode{
+    return &Value{Val: val} 
+}
+
+
+
 type TreeNode interface {
-    Eval() float64 
+    Eval() Result 
+    GetVal() Result 
     GetKind() TokenType
 }
 
@@ -65,6 +156,7 @@ type TreeNode interface {
 
 type OpNode struct {
     Op    TokenType 
+    Res   Result 
     L TreeNode 
     R TreeNode 
 }
@@ -79,32 +171,40 @@ func (o OpNode) String() string {
     }
 }
 
-func (o OpNode) Eval() float64{
+func (o *OpNode) Eval() Result{
     switch o.Op {
     case Plus:
-        return o.L.Eval() + o.R.Eval()
+        return o.L.GetVal().Add(o.R.GetVal())
     case Multiply:
-        return o.L.Eval() * o.R.Eval()
+        return o.L.GetVal().Multiplication(o.R.GetVal())
     case Caret:  
-        return math.Pow(o.L.Eval() , o.R.Eval())
-    case Minus:  
-        return o.L.Eval() - o.R.Eval()
-    default:
-        return 0
+        return o.L.GetVal().CaretOperation(o.R.Eval())
     }
+
+    return Result{} 
 }
+
+func (o OpNode) GetVal() Result{
+    return o.Res
+}
+
+func (o Value) GetVal() Result{
+    return Result{IsVar: false, NumberResult : o.Val}
+}
+
+func (o Var) GetVal() Result{
+    return Result{IsVar: true, VarResult: o}
+}
+
+
 
 func NewOpr(a TreeNode, b TreeNode, t TokenType ) TreeNode{
-    return OpNode{Op: t, L: a, R: b} 
+    return &OpNode{Op: t, L: a, R: b} 
 }
 
 
 
 
-
-func NewVal(val float64) TreeNode{
-    return Value{Val: val} 
-}
 
 
 func (o OpNode) GetKind() TokenType{
