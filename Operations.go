@@ -59,9 +59,9 @@ func (l Result) Multiplication(r Result) Result {
 
 func (l Result) CaretOperation(r Result) Result {
 	if l.IsVar == false && r.IsVar == false {
-		fmt.Println(">>>> ^ ", l, r)
 		return Result{IsVar: false, NumberResult: math.Pow(l.NumberResult, r.NumberResult)}
 	} else {
+
 		if l.IsVar {
 			if r.NumberResult == 0 {
 				return Result{IsVar: false, NumberResult: 1}

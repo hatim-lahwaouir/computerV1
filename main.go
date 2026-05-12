@@ -1,9 +1,9 @@
 package main
 
 import (
-//	"errors"
 	"fmt"
 	"os"
+    "strings"
 	"strconv"
 	"unicode"
 	"sort"
@@ -168,6 +168,7 @@ func Parse(input string) ([]Token, error) {
 		tokens       []Token
 	)
 
+
 	for i := 0; i < len(input); i++ {
 
 		if unicode.IsSpace(rune(input[i])) {
@@ -176,7 +177,6 @@ func Parse(input string) ([]Token, error) {
 
 		if _ , ok := TokenState[string(input[i])]; ok == true {
 			tokens = append(tokens, Token{Kind: TokenState[string(input[i])]})
-
 		} else {
 			// treating the number
 			var (
@@ -196,18 +196,17 @@ func Parse(input string) ([]Token, error) {
 			}
 			e = i
 			if isFloat == true {
-				val, err := strconv.ParseFloat(input[s:e], 32)
+				val, err := strconv.ParseFloat(input[s:e], 64)
 
 				if err != nil {
-					fmt.Println(input[s:e], s, e)
-					Fatal("error parssing number")
+                    ReportError(len(tokens) - 1, tokens, "Invalid number " +  input[s:e])
 				}
 				tokens = append(tokens, Token{Kind: FloatNumber, Value: float64(val) })
 			} else {
-				val, err := strconv.Atoi(input[s:e])
+				
+				val, err := strconv.ParseFloat(input[s:e], 64)
 				if err != nil {
-					fmt.Println(input[s:e], s, e)
-					Fatal("error parssing number")
+                    ReportError(len(tokens) - 1, tokens, "Invalid number " +  input[s:e])
 				}
 				tokens = append(tokens, Token{Kind: FloatNumber, Value: float64(val) })
 			}
@@ -243,25 +242,32 @@ func dbgV2(tokens []Token) {
 }
 
 
-func PrintTree(node TreeNode) {
-    fmt.Println("---Print Tree---")
-    fmt.Println(node)
-    fmt.Println()
-}
-
 
 func SimplifyEquation(tokens []Token) []Token{
     var (
         newTokens []Token
     )
+
+    // remove + from the first token
+    if tokens[0].Kind == Plus{
+        tokens[0] = Token{Kind: Empty}
+    }
     for i := 0; i < len(tokens); i++{
         if tokens[i].GetType() == Minus{
             tokens[i].Kind = Plus
-            tokens[i + 1].ChangeSign()
+            if  i + 1 < len(tokens) {
+                tokens[i + 1].ChangeSign()
+            }
+            if i == 0 && tokens[i].Kind == Plus{
+                tokens[0] = Token{Kind: Empty}
+            }
         }
     }
 
     for i := 0; i < len(tokens); i++{
+        if tokens[i].GetType() == Empty {
+            continue
+        }
         if tokens[i].GetType() == Variable || tokens[i].GetType() == VariableNeg {
            if i > 0 && i + 1 < len(tokens) && tokens[i - 1].GetType() == FloatNumber && tokens[i + 1].GetType() == FloatNumber {
                 newTokens = append(newTokens, Token{Kind: Multiply})
@@ -300,56 +306,189 @@ func CalculateTree(root TreeNode) Result{
 
 // calculate the reduce form
 
-func ReduceForm(c float64){
- 	// StackOfVar 
-	var (
+func ReduceForm(side1 []Var, side2 []Var,  c float64) (map[int]float64, []int){
+    var (
 		mp map[int]float64
+        keys   []int
 	)
+
 	mp = make(map[int]float64)
-	for i := 0; i < len(StackOfVar); i++{
-		mp[StackOfVar[i].Degree] += StackOfVar[i].Factor 
+	for i := 0; i < len(side1); i++{
+		mp[side1[i].Degree] += side1[i].Factor 
+	}
+
+    for i := 0; i < len(side2); i++{
+		mp[side2[i].Degree] -= side2[i].Factor 
 	}
 
 	fmt.Println("-- Reduced Form --")
-	for k,  _ := range(mp){
-		keys = append(k, keys)
-	}
-	sort.
-	for k, val := range(mp){
-		fmt.Printf("%.2f * X^ %d +", val, k)
-	}
-	fmt.Println(c)
 
+	for k,  _ := range(mp){
+		keys = append(keys,k)
+	}
+    sort.Ints(keys)
+
+
+
+    fmt.Printf("(%.2f * X ^ 0 ) + ", c )
+	for i, k := range(keys){
+        if mp[k] != 0 {
+	        fmt.Printf("(%.2f * X^ %d)", mp[k], k)
+        }
+        if i + 1 != len(keys){
+            fmt.Printf(" + ")
+        }
+	}
+    fmt.Println(" = 0")
+    return mp, keys
 }
 
-func main() {
+// Validation 
 
-	var (
+func Validation(tokens []Token) int {
+    var (
+        IsOpr  bool
+    )
+
+
+    IsOpr = false
+
+    if len(tokens) == 0 {
+        return 0  
+    }
+
+    if IsOperation(tokens[0]) == true {
+        IsOpr = true
+        if tokens[0].GetType() != Minus && tokens[0].GetType() != Plus{
+            return 0
+        }
+    }
+
+    for i := 0 ; i < len(tokens) ; i++ {
+        if IsOpr {
+            if IsOperation(tokens[i]) == false{
+                return i
+            }
+        } else {
+            if IsVariable(tokens[i]) == false && tokens[i].GetType() != FloatNumber {
+                return i
+            }
+        }
+        IsOpr = ! IsOpr
+    }
+
+    // last token must be a number
+    if IsOpr  == false {
+                return  len(tokens) - 1 
+    }
+
+    for i := 0; i < len(tokens); i++ {
+        if tokens[i].GetType() == Caret{
+            if tokens[i + 1].Value !=  float64(int64(tokens[i + 1].Value)) {
+                return i + 1
+            }
+            if IsVariable(tokens[i + 1]) {
+                return i + 1
+            }
+        }
+    }
+
+
+    return -1
+}
+
+
+func ParseSide(input string) float64 {
+    var (
 		tokens       []Token
 		node        TreeNode
         cur             int
-		c				float64
+        c float64
 	)
     cur = 0
+
+
+	tokens, _ = Parse(input)
+    tokens = SimplifyEquation(tokens)
+    if index := Validation(tokens); index != -1 {
+        ReportError(index, tokens, "Invalid Operation (program change - to + | pay attention to this )")
+    }
+    node = ParseExpression(tokens,&cur)
+    CalculateTree(node)
+
+    if res,ok := node.(*OpNode); ok {
+		c = res.Res.NumberResult
+        if res.Res.IsVar {
+            StackOfVar =  append(StackOfVar, res.Res.VarResult)
+            return 0
+        }
+        return c 
+	}
+    
+    return 0
+}
+
+
+func PolynomialDegree(keys []int, mp map[int]float64) int {
+	fmt.Println("-- PolynomialDegree --")
+
+    for i := len(keys) - 1; i >= 0; i--{
+
+        if mp[keys[i]] != 0 {
+            fmt.Println(keys[i])
+            return keys[i]
+        }
+    }
+    fmt.Println(0)
+    return 0
+}
+
+func StartParsing(input string){
+    var (
+        Sides []string
+        c1 float64
+        c2 float64
+        VarOfSide1 []Var   
+        VarOfSide2 []Var   
+		mp map[int]float64
+        keys   []int
+        equationDegree int
+    )
+
+    Sides = strings.Split(input, "=")
+
+    if len(Sides) != 2 {
+        Fatal("invalide equation '=', either more then one was provided or non was provided ")
+    }
+    c1 = ParseSide(Sides[0])
+    // reset the stack for Xs in the other side
+    VarOfSide1 = StackOfVar
+    StackOfVar = []Var{} 
+    c2 = ParseSide(Sides[1])
+    VarOfSide2 = StackOfVar
+
+    
+    mp, keys = ReduceForm(VarOfSide1, VarOfSide2, c1 - c2)
+
+    equationDegree = PolynomialDegree(keys, mp)
+
+    if equationDegree > 2 {
+        fmt.Println("The polynomial degree is strictly greater than 2, I can't solve.")
+        return
+
+    }
+    
+}
+
+
+
+func main() {
 
 	if len(os.Args) != 2 {
 		Fatal("we need 2 arguments")
 	}
+    StartParsing(os.Args[1])
 
-	tokens, _ = Parse(os.Args[1])
-
-    tokens = SimplifyEquation(tokens)
-
-	dbgV2(tokens)
-    node = ParseExpression(tokens,&cur)
-    PrintTree(node)
-    CalculateTree(node)
-
-    if res,ok := node.(*OpNode); ok {
-        fmt.Println("c = ",res.Res.NumberResult)
-		c = res.Res.NumberResult
-	}
-	ReduceForm(c)
-    //    fmt.Println(StackOfVar)
+	//    fmt.Println(StackOfVar)
 	//dbgV2(tokens)
 }

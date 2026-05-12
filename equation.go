@@ -1,5 +1,10 @@
 package main
 
+import (
+    "fmt"
+)
+
+
 type TokenType int
 
 type Token struct {
@@ -17,6 +22,7 @@ const (
 	Variable
 	VariableNeg
 	Empty
+    Equal
 )
 
 var TokenState = map[string]TokenType{
@@ -26,6 +32,7 @@ var TokenState = map[string]TokenType{
 	"^":    Caret,
 	"X":    Variable,
 	"(-X)": VariableNeg,
+    "=": Equal,
 }
 
 var TokenStr = map[TokenType]string{
@@ -35,6 +42,7 @@ var TokenStr = map[TokenType]string{
 	Caret:       "^",
 	Variable:    "X",
 	VariableNeg: "(-x)",
+	Equal : "=",
 }
 
 func IsVariable(token Token) bool {
@@ -61,6 +69,17 @@ func (t *Token) NumericValue() (float64, bool) {
 		return t.Value, true
 	}
 	return 0, false
+}
+
+func (t Token) String() (string) {
+	if t.Kind != FloatNumber {
+		return fmt.Sprintf("%s", TokenStr[t.Kind]) 
+	} 
+	
+    if t.Value < 0  {
+        return fmt.Sprintf("(%.2f)", t.Value) 
+    }
+    return fmt.Sprintf("%.2f", t.Value) 
 }
 
 func (t *Token) ChangeSign() {
