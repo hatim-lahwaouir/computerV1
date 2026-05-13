@@ -31,6 +31,7 @@ var TokenState = map[string]TokenType{
 	"*":    Multiply,
 	"^":    Caret,
 	"X":    Variable,
+	"x":    Variable,
 	"(-X)": VariableNeg,
     "=": Equal,
 }

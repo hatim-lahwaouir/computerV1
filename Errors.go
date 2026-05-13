@@ -8,6 +8,12 @@ import (
 )
 
 
+var side bool = true
+
+func ReportErrorSetSide(){
+    side = ! side
+}
+
 
 func ReportError(index int , tokens []Token, msg string) {
     var (
@@ -27,5 +33,10 @@ func ReportError(index int , tokens []Token, msg string) {
     fmt.Printf("%s^\n", pad)
     fmt.Printf("%s\n", msg)
 
+    if side == true {
+        fmt.Println("In first side of equation")
+    } else {
+        fmt.Println("In second side of equation")
+    }
     os.Exit(1)
 }

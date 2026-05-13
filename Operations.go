@@ -2,10 +2,52 @@ package main
 
 import (
 	"fmt"
-	"math"
 )
 
 var StackOfVar []Var
+
+func Pow(nbr float64, k int) float64 {
+    if k == 0 {
+        return 1
+    }
+    if k == 1 {
+        return nbr
+    }
+
+    if k % 2 == 0 {
+        res := Pow(nbr, k/ 2)
+        return  res * res
+    }
+
+    res := Pow(nbr, k /2)
+
+    return  res * res * nbr
+}
+func abs(nbr float64) float64{
+    if nbr < 0{
+        return -nbr
+    }
+    return nbr 
+}
+
+func Sqrt(nbr float64) float64{
+
+    guess := nbr / 2
+    precision :=0.00001
+    for ;; {
+        if abs(guess * guess - nbr) <= precision {
+            break
+        }
+        guess = (guess + nbr / guess) / 2.0
+    }
+    return guess
+}
+
+func Gcd() {
+
+}
+
+
 
 type Result struct {
 	IsVar        bool
@@ -59,7 +101,7 @@ func (l Result) Multiplication(r Result) Result {
 
 func (l Result) CaretOperation(r Result) Result {
 	if l.IsVar == false && r.IsVar == false {
-		return Result{IsVar: false, NumberResult: math.Pow(l.NumberResult, r.NumberResult)}
+		return Result{IsVar: false, NumberResult: Pow(l.NumberResult, int(r.NumberResult))}
 	} else {
 
 		if l.IsVar {
@@ -82,6 +124,7 @@ func NewVar(dg int, Factor float64) TreeNode {
 }
 
 func (o *Var) Eval() Result {
+
 	return Result{IsVar: true, VarResult: *o}
 }
 

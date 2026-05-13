@@ -14,7 +14,7 @@ import (
 
 
 
-// F = X | Number | X * CARET  
+// F = X | Number | X ^ CARET  
 func ParseFactor(token []Token, cur *int) (TreeNode){
 
     if *cur >= len(token) {
@@ -68,7 +68,6 @@ func ParseFactor(token []Token, cur *int) (TreeNode){
     return nil
 }
 
-// P = F ^  NUMBER
 
 
 // T = F * T |  F  
@@ -206,7 +205,7 @@ func Parse(input string) ([]Token, error) {
 				
 				val, err := strconv.ParseFloat(input[s:e], 64)
 				if err != nil {
-                    ReportError(len(tokens) - 1, tokens, "Invalid number " +  input[s:e])
+                    ReportError(len(tokens) - 1, tokens, "Invalid number " +  input[s:e] )
 				}
 				tokens = append(tokens, Token{Kind: FloatNumber, Value: float64(val) })
 			}
@@ -269,14 +268,7 @@ func SimplifyEquation(tokens []Token) []Token{
             continue
         }
         if tokens[i].GetType() == Variable || tokens[i].GetType() == VariableNeg {
-           if i > 0 && i + 1 < len(tokens) && tokens[i - 1].GetType() == FloatNumber && tokens[i + 1].GetType() == FloatNumber {
-                newTokens = append(newTokens, Token{Kind: Multiply})
-                newTokens = append(newTokens, tokens[i])
-                newTokens = append(newTokens, Token{Kind: Multiply})
-           }else if i + 1 < len(tokens) && tokens[i + 1].GetType() == FloatNumber {
-                newTokens = append(newTokens, tokens[i])
-                newTokens = append(newTokens, Token{Kind: Multiply})
-            } else if i > 0 && tokens[i - 1].GetType() == FloatNumber{
+            if i > 0 && tokens[i - 1].GetType() == FloatNumber{
                 newTokens = append(newTokens, Token{Kind: Multiply})
                 newTokens = append(newTokens, tokens[i])
             } else {
@@ -290,18 +282,18 @@ func SimplifyEquation(tokens []Token) []Token{
 }
 
 
-func CalculateTree(root TreeNode) Result{
+func CalculateTree(root TreeNode) {
     if root == nil {
-        return Result{}
+        return 
     }
 
     if node, ok := root.(*OpNode); ok {
         CalculateTree(node.L)
         CalculateTree(node.R)
         node.Res = node.Eval()
+        return
     }
-
-    return Result{}
+    root.Eval()
 }
 
 // calculate the reduce form
@@ -357,13 +349,6 @@ func Validation(tokens []Token) int {
         return 0  
     }
 
-    if IsOperation(tokens[0]) == true {
-        IsOpr = true
-        if tokens[0].GetType() != Minus && tokens[0].GetType() != Plus{
-            return 0
-        }
-    }
-
     for i := 0 ; i < len(tokens) ; i++ {
         if IsOpr {
             if IsOperation(tokens[i]) == false{
@@ -402,8 +387,8 @@ func ParseSide(input string) float64 {
     var (
 		tokens       []Token
 		node        TreeNode
+        c           Result
         cur             int
-        c float64
 	)
     cur = 0
 
@@ -416,16 +401,12 @@ func ParseSide(input string) float64 {
     node = ParseExpression(tokens,&cur)
     CalculateTree(node)
 
-    if res,ok := node.(*OpNode); ok {
-		c = res.Res.NumberResult
-        if res.Res.IsVar {
-            StackOfVar =  append(StackOfVar, res.Res.VarResult)
+    c = node.GetVal() 
+    if c.IsVar {
+            StackOfVar = append(StackOfVar, c.VarResult)
             return 0
-        }
-        return c 
-	}
-    
-    return 0
+    }
+    return c.NumberResult 
 }
 
 
@@ -441,6 +422,41 @@ func PolynomialDegree(keys []int, mp map[int]float64) int {
     }
     fmt.Println(0)
     return 0
+}
+func findSolution(equationDegree int ,  mp map[int]float64,  c float64){
+    var (
+        delta float64
+        a float64
+        b float64
+
+    )
+    
+
+    if equationDegree == 1 {
+        if c == 0 {
+            fmt.Printf("the solution is 0\n")
+        } else {
+            fmt.Printf("the solution is %.3f\n", -c / mp[1] ) 
+        }
+    } else if  equationDegree == 2 {
+        a = mp[2]
+        b =  mp[1]
+        delta =  (b * b) - (4 * a * c)
+        if delta > 0 {
+            fmt.Println("Discriminant is strictly positive, the two solutions are:")
+            fmt.Printf("%.3f\n",(-b + Sqrt(delta)) / (2 * a))
+            fmt.Printf("%.3f\n",(-b - Sqrt(delta)) / (2 * a))
+
+        } else if delta == 0 {
+            fmt.Println("Discriminant is equalt to zero, the only solutions is:")
+            fmt.Println(-b / (2 * a))
+
+        } else if delta < 0 {
+            fmt.Println("Discriminant is strictly negative, the two complex solutions are:")
+            fmt.Printf("%.3f + %.3fi\n", -b/ (2 * a), Sqrt(- delta) / (2 * a) )
+            fmt.Printf("%.3f - %.3fi\n",-b/ (2 * a),Sqrt(-delta) / (2 * a) )
+        }
+    }
 }
 
 func StartParsing(input string){
@@ -464,6 +480,8 @@ func StartParsing(input string){
     // reset the stack for Xs in the other side
     VarOfSide1 = StackOfVar
     StackOfVar = []Var{} 
+    // change side of reporting errors
+    ReportErrorSetSide()
     c2 = ParseSide(Sides[1])
     VarOfSide2 = StackOfVar
 
@@ -475,6 +493,16 @@ func StartParsing(input string){
     if equationDegree > 2 {
         fmt.Println("The polynomial degree is strictly greater than 2, I can't solve.")
         return
+
+    }
+    if equationDegree == 0 {
+        if c1 - c2 == 0 {
+            fmt.Println("Any real number is a solution.")
+        } else {
+            fmt.Println("No solution.")
+        }
+    } else {
+        findSolution(equationDegree,  mp,  c1 - c2)
 
     }
     
