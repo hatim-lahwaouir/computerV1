@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
     "strings"
+    "bufio"
 	"strconv"
 	"unicode"
 	"sort"
@@ -431,6 +432,7 @@ func findSolution(equationDegree int ,  mp map[int]float64,  c float64){
 
     )
     
+    
 
     if equationDegree == 1 {
         if c == 0 {
@@ -439,22 +441,39 @@ func findSolution(equationDegree int ,  mp map[int]float64,  c float64){
             fmt.Printf("the solution is %.3f\n", -c / mp[1] ) 
         }
     } else if  equationDegree == 2 {
+        fmt.Println("--- Intermediate steps ---")
+
+        fmt.Printf("Delta = (%.2f * %.f) - (4 * %.2f * %.2f)\n", b, b, a, c)
+
         a = mp[2]
         b =  mp[1]
         delta =  (b * b) - (4 * a * c)
+
+        fmt.Printf("Delta = %.2f\n", delta)
         if delta > 0 {
+            fmt.Printf("Sqrt(Delta) = %.2f\n", Sqrt(delta))
             fmt.Println("Discriminant is strictly positive, the two solutions are:")
-            fmt.Printf("%.3f\n",(-b + Sqrt(delta)) / (2 * a))
-            fmt.Printf("%.3f\n",(-b - Sqrt(delta)) / (2 * a))
+
+            fmt.Printf("x1 = (%.2f + Sqrt(delta)) / (2 * %.2f)\n", -b, a)
+            fmt.Printf("x2 = (%.2f - Sqrt(delta)) / (2 * %.2f)\n", -b, a)
+
+            fmt.Printf("x1 = %.3f\n",(-b + Sqrt(delta)) / (2 * a))
+            fmt.Printf("x2 = %.3f\n",(-b - Sqrt(delta)) / (2 * a))
 
         } else if delta == 0 {
+            fmt.Printf("Sqrt(Delta) = %.2f\n", Sqrt(delta))
             fmt.Println("Discriminant is equalt to zero, the only solutions is:")
-            fmt.Println(-b / (2 * a))
+            fmt.Printf("x = (%.2f) / (2 * %.2f)\n", -b, a)
+            fmt.Println("x = ",-b / (2 * a))
 
         } else if delta < 0 {
             fmt.Println("Discriminant is strictly negative, the two complex solutions are:")
-            fmt.Printf("%.3f + %.3fi\n", -b/ (2 * a), Sqrt(- delta) / (2 * a) )
-            fmt.Printf("%.3f - %.3fi\n",-b/ (2 * a),Sqrt(-delta) / (2 * a) )
+
+            fmt.Printf("x1 = (%.2f / (2 * %.2f) + (Sqrt(%.2f) / (2 * %.2f))\n", -b, a, -delta, a)
+            fmt.Printf("x2 = (%.2f / (2 * %.2f) - (Sqrt(%.2f) / (2 * %.2f))\n", -b, a, -delta, a)
+
+            fmt.Printf("x1 = %.3f + %.3fi\n", -b/ (2 * a), Sqrt(- delta) / (2 * a) )
+            fmt.Printf("x2 = %.3f - %.3fi\n",-b/ (2 * a),Sqrt(-delta) / (2 * a) )
         }
     }
 }
@@ -474,8 +493,13 @@ func StartParsing(input string){
     Sides = strings.Split(input, "=")
 
     if len(Sides) != 2 {
-        Fatal("invalide equation '=', either more then one was provided or non was provided ")
+        index :=  strings.Index(input, "=")
+        if index == -1{
+            index = len(input) - 1
+        }
+        ReportErrortringString(index, input, "invalide equation '=', either more then one was provided or non was provided ")
     }
+
     c1 = ParseSide(Sides[0])
     // reset the stack for Xs in the other side
     VarOfSide1 = StackOfVar
@@ -511,12 +535,22 @@ func StartParsing(input string){
 
 
 func main() {
+    var (
+        input string
+    )
 
-	if len(os.Args) != 2 {
-		Fatal("we need 2 arguments")
-	}
-    StartParsing(os.Args[1])
+	if len(os.Args) == 2 {
+        StartParsing(os.Args[1])
+	} else {
+        fmt.Println("Enter Equation:")
+        scanner := bufio.NewScanner(os.Stdin)
+        if scanner.Scan() {
+            input = scanner.Text()
+        }
+        if err := scanner.Err(); err != nil {
+            fmt.Fprintln(os.Stderr, "Error reading:", err)
+        }
+        StartParsing(input)
+    }
 
-	//    fmt.Println(StackOfVar)
-	//dbgV2(tokens)
 }

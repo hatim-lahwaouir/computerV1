@@ -23,6 +23,7 @@ func Pow(nbr float64, k int) float64 {
 
     return  res * res * nbr
 }
+
 func abs(nbr float64) float64{
     if nbr < 0{
         return -nbr
@@ -43,16 +44,19 @@ func Sqrt(nbr float64) float64{
     return guess
 }
 
-func Gcd() {
-
-}
-
-
-
 type Result struct {
 	IsVar        bool
 	VarResult    Var
 	NumberResult float64
+}
+
+
+func (s Result)  String()  string{
+    if s.IsVar {
+        return fmt.Sprintf("%s", s.VarResult)
+    } 
+
+   return fmt.Sprintf("%.2f", s.NumberResult)
 }
 
 func (l Result) Add(r Result) Result {
@@ -62,7 +66,6 @@ func (l Result) Add(r Result) Result {
 	} else {
 
 		if l.IsVar && r.IsVar && r.VarResult.Degree == l.VarResult.Degree {
-			fmt.Println(">>", r, l)
 			return l.VarResult.Add(r.VarResult)
 		} else if l.IsVar && r.IsVar && r.VarResult.Degree != l.VarResult.Degree {
 
@@ -78,7 +81,6 @@ func (l Result) Add(r Result) Result {
 			return l
 		}
 
-		fmt.Println("here", l, r)
 
 	}
 	return Result{}
@@ -145,9 +147,10 @@ func (l Var) MultiplyByFactor(factor float64) Result {
 }
 
 func (o Var) String() string {
-	if o.Factor < 0 {
-		return fmt.Sprintf("(%.2f * x^%d)", o.Factor, o.Degree)
-	}
+
+    if o.Degree == 1 {
+		    return fmt.Sprintf("(%.2f * x)", o.Factor)
+    }
 	return fmt.Sprintf("(%.2f * x^%d)", o.Factor, o.Degree)
 }
 

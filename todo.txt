@@ -1,4 +1,0 @@
-- pointing where error exists | no required 
-- priting reduce format in good way 
-- error reporting 
-- validation after tokenizer 
